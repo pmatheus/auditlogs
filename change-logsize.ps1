@@ -4,28 +4,28 @@
 
 <#
 .SYNOPSIS
-    Configures Windows Event Logs settings via Group Policy at domain level
+    Configures Windows Event Log size dimensions via Group Policy
 .DESCRIPTION
-    This script creates or modifies a GPO to configure Windows Event Log settings,
-    PowerShell logging, and audit policies for all domain computers.
+    This script creates or modifies a GPO to exclusively configure Windows Event Log
+    size settings for domain computers. It focuses solely on log size optimization
+    without modifying other logging system configurations or functionalities.
     Based on Yamato Security's Configure Windows Event Logs Batch File
 .AUTHOR
-    Converted to PowerShell GPO deployment
+    Converted to PowerShell GPO deployment - Optimized for log size management
 .NOTES
     - Requires Domain Admin privileges
     - Requires Group Policy Management Console (GPMC) installed
+    - Exclusively modifies log size parameters - no other logging configurations
+    - GPO linking to domain root must be performed manually after script execution
     - Test thoroughly in a lab environment before production deployment
 #>
 
 param(
     [Parameter(Mandatory=$false)]
-    [string]$GPOName = "Windows Event Log Configuration",
+    [string]$GPOName = "Windows Event Log Size Configuration",
     
     [Parameter(Mandatory=$false)]
     [string]$DomainName = $env:USERDNSDOMAIN,
-    
-    [Parameter(Mandatory=$false)]
-    [switch]$LinkToRoot = $true,
     
     [Parameter(Mandatory=$false)]
     [switch]$BackupExisting = $true
@@ -60,36 +60,47 @@ try {
 }
 
 
+# Optimized log size configurations with predefined size constants
+$LogSizeConstants = @{
+    "1GB" = 1073741824    # 1 * 1024 * 1024 * 1024
+    "512MB" = 536870912   # 512 * 1024 * 1024
+    "256MB" = 268435456   # 256 * 1024 * 1024
+    "128MB" = 134217728   # 128 * 1024 * 1024
+    "64MB" = 67108864     # 64 * 1024 * 1024
+    "32MB" = 33554432     # 32 * 1024 * 1024
+}
+
+# Optimized log configuration with size categories for easier management
 $logSizes = @{
-    # 1GB logs
-    "Security" = 1073741824
-    "Microsoft-Windows-PowerShell/Operational" = 1073741824
-    "Windows PowerShell" = 1073741824
-    "PowerShellCore/Operational" = 1073741824
-    # "Microsoft-Windows-Sysmon/Operational" = 1073741824  # Uncomment if using Sysmon
+    # Critical security logs - 1GB
+    "Security" = $LogSizeConstants["1GB"]
+    "Microsoft-Windows-PowerShell/Operational" = $LogSizeConstants["1GB"]
+    "Windows PowerShell" = $LogSizeConstants["1GB"]
+    "PowerShellCore/Operational" = $LogSizeConstants["1GB"]
+    # "Microsoft-Windows-Sysmon/Operational" = $LogSizeConstants["1GB"]  # Uncomment if using Sysmon
     
-    # 128MB logs
-    "System" = 134217728
-    "Application" = 134217728
-    "Microsoft-Windows-Windows Defender/Operational" = 134217728
-    "Microsoft-Windows-Bits-Client/Operational" = 134217728
-    "Microsoft-Windows-Windows Firewall With Advanced Security/Firewall" = 134217728
-    "Microsoft-Windows-NTLM/Operational" = 134217728
-    "Microsoft-Windows-Security-Mitigations/KernelMode" = 134217728
-    "Microsoft-Windows-Security-Mitigations/UserMode" = 134217728
-    "Microsoft-Windows-PrintService/Admin" = 134217728
-    "Microsoft-Windows-PrintService/Operational" = 134217728
-    "Microsoft-Windows-SmbClient/Security" = 134217728
-    "Microsoft-Windows-AppLocker/MSI and Script" = 134217728
-    "Microsoft-Windows-AppLocker/EXE and DLL" = 134217728
-    "Microsoft-Windows-AppLocker/Packaged app-Deployment" = 134217728
-    "Microsoft-Windows-AppLocker/Packaged app-Execution" = 134217728
-    "Microsoft-Windows-CodeIntegrity/Operational" = 134217728
-    "Microsoft-Windows-Diagnosis-Scripted/Operational" = 134217728
-    "Microsoft-Windows-DriverFrameworks-UserMode/Operational" = 134217728
-    "Microsoft-Windows-WMI-Activity/Operational" = 134217728
-    "Microsoft-Windows-TerminalServices-LocalSessionManager/Operational" = 134217728
-    "Microsoft-Windows-TaskScheduler/Operational" = 134217728
+    # High-volume system logs - 128MB
+    "System" = $LogSizeConstants["128MB"]
+    "Application" = $LogSizeConstants["128MB"]
+    "Microsoft-Windows-Windows Defender/Operational" = $LogSizeConstants["128MB"]
+    "Microsoft-Windows-Bits-Client/Operational" = $LogSizeConstants["128MB"]
+    "Microsoft-Windows-Windows Firewall With Advanced Security/Firewall" = $LogSizeConstants["128MB"]
+    "Microsoft-Windows-NTLM/Operational" = $LogSizeConstants["128MB"]
+    "Microsoft-Windows-Security-Mitigations/KernelMode" = $LogSizeConstants["128MB"]
+    "Microsoft-Windows-Security-Mitigations/UserMode" = $LogSizeConstants["128MB"]
+    "Microsoft-Windows-PrintService/Admin" = $LogSizeConstants["128MB"]
+    "Microsoft-Windows-PrintService/Operational" = $LogSizeConstants["128MB"]
+    "Microsoft-Windows-SmbClient/Security" = $LogSizeConstants["128MB"]
+    "Microsoft-Windows-AppLocker/MSI and Script" = $LogSizeConstants["128MB"]
+    "Microsoft-Windows-AppLocker/EXE and DLL" = $LogSizeConstants["128MB"]
+    "Microsoft-Windows-AppLocker/Packaged app-Deployment" = $LogSizeConstants["128MB"]
+    "Microsoft-Windows-AppLocker/Packaged app-Execution" = $LogSizeConstants["128MB"]
+    "Microsoft-Windows-CodeIntegrity/Operational" = $LogSizeConstants["128MB"]
+    "Microsoft-Windows-Diagnosis-Scripted/Operational" = $LogSizeConstants["128MB"]
+    "Microsoft-Windows-DriverFrameworks-UserMode/Operational" = $LogSizeConstants["128MB"]
+    "Microsoft-Windows-WMI-Activity/Operational" = $LogSizeConstants["128MB"]
+    "Microsoft-Windows-TerminalServices-LocalSessionManager/Operational" = $LogSizeConstants["128MB"]
+    "Microsoft-Windows-TaskScheduler/Operational" = $LogSizeConstants["128MB"]
 }
 
 # Logs to enable
@@ -98,34 +109,171 @@ $logsToEnable = @(
     "Microsoft-Windows-DriverFrameworks-UserMode/Operational"
 )
 
+# Optimized GPO management with validation
+Write-ColorOutput "`nConfiguring GPO: $GPOName" "Cyan"
+
+# Validate GPO name format
+if ([string]::IsNullOrWhiteSpace($GPOName) -or $GPOName.Length -gt 255) {
+    Write-ColorOutput "Invalid GPO name. Must be 1-255 characters." "Red"
+    exit 1
+}
+
+try {
+    # Check if GPO exists with optimized query
+    $gpo = Get-GPO -Name $GPOName -ErrorAction SilentlyContinue
+    
+    if ($gpo) {
+        Write-ColorOutput "GPO '$GPOName' found (ID: $($gpo.Id))" "Yellow"
+        
+        # Optimized backup process
+        if ($BackupExisting) {
+            $timestamp = Get-Date -Format 'yyyyMMdd_HHmmss'
+            $backupPath = ".\GPO_Backup_$timestamp"
+            
+            # Ensure backup directory exists
+            if (-not (Test-Path $backupPath)) {
+                New-Item -Path $backupPath -ItemType Directory -Force | Out-Null
+            }
+            
+            Write-ColorOutput "Creating backup: $backupPath" "Yellow"
+            $backupInfo = Backup-GPO -Name $GPOName -Path $backupPath
+            Write-ColorOutput "Backup completed: $($backupInfo.BackupDirectory)" "Green"
+        }
+    } else {
+        Write-ColorOutput "Creating new GPO: $GPOName" "Green"
+        $gpo = New-GPO -Name $GPOName -Comment "Automated Event Log Size Configuration - Created $(Get-Date)"
+        Write-ColorOutput "GPO created successfully (ID: $($gpo.Id))" "Green"
+    }
+    
+    # Validate GPO is accessible
+    if (-not $gpo -or -not $gpo.Id) {
+        throw "GPO validation failed - unable to access GPO object"
+    }
+    
+} catch {
+    Write-ColorOutput "Error managing GPO '$GPOName': $($_.Exception.Message)" "Red"
+    Write-ColorOutput "Ensure you have sufficient permissions and the GPO name is valid." "Yellow"
+    exit 1
+}
+
 Write-ColorOutput "`nConfiguring Event Log sizes..." "Yellow"
 
-# Configure log sizes via registry in GPO
-foreach ($log in $logSizes.GetEnumerator()) {
+# Optimized batch processing for log size configuration
+$successCount = 0
+$failureCount = 0
+$configurationResults = @()
+
+# Pre-calculate all registry operations for better performance
+$registryOperations = foreach ($log in $logSizes.GetEnumerator()) {
     $logName = $log.Key -replace '/', '-'
     $maxSize = $log.Value
-    
-    # Calculate size in KB (Event Log expects KB)
-    $maxSizeKB = $maxSize / 1024
-    
-    # Registry path for event log configuration
+    $maxSizeKB = [math]::Floor($maxSize / 1024)  # More precise KB calculation
     $regPath = "HKLM\SOFTWARE\Policies\Microsoft\Windows\EventLog\$logName"
     
-    try {
-        # Set maximum log size
-        Set-GPRegistryValue -Name $GPOName -Key $regPath -ValueName "MaxSize" -Type DWord -Value $maxSizeKB | Out-Null
-        
-        # Set retention (0 = overwrite as needed)
-        Set-GPRegistryValue -Name $GPOName -Key $regPath -ValueName "Retention" -Type DWord -Value 0 | Out-Null
-        
-        # Enable log if in the enable list
-        if ($logsToEnable -contains $log.Key) {
-            Set-GPRegistryValue -Name $GPOName -Key $regPath -ValueName "Enabled" -Type DWord -Value 1 | Out-Null
-            Write-ColorOutput "  Enabled and configured: $($log.Key) - Size: $($maxSize/1MB)MB" "Green"
-        } else {
-            Write-ColorOutput "  Configured: $($log.Key) - Size: $($maxSize/1MB)MB" "Gray"
-        }
-    } catch {
-        Write-ColorOutput "  Failed to configure: $($log.Key) - $_" "Red"
+    [PSCustomObject]@{
+        LogKey = $log.Key
+        LogName = $logName
+        MaxSize = $maxSize
+        MaxSizeKB = $maxSizeKB
+        RegistryPath = $regPath
+        SizeMB = [math]::Round($maxSize / 1MB, 0)
+        IsEnabled = $logsToEnable -contains $log.Key
     }
 }
+
+# Execute registry operations with optimized error handling
+foreach ($operation in $registryOperations) {
+    try {
+        # Batch registry operations for better performance
+        $registryValues = @(
+            @{ ValueName = "MaxSize"; Type = "DWord"; Value = $operation.MaxSizeKB },
+            @{ ValueName = "Retention"; Type = "DWord"; Value = 0 }
+        )
+        
+        # Add enabled setting if log should be enabled
+        if ($operation.IsEnabled) {
+            $registryValues += @{ ValueName = "Enabled"; Type = "DWord"; Value = 1 }
+        }
+        
+        # Apply all registry values for this log
+        foreach ($regValue in $registryValues) {
+            Set-GPRegistryValue -Name $GPOName -Key $operation.RegistryPath `
+                -ValueName $regValue.ValueName -Type $regValue.Type -Value $regValue.Value | Out-Null
+        }
+        
+        $successCount++
+        $status = if ($operation.IsEnabled) { "Enabled and configured" } else { "Configured" }
+        $color = if ($operation.IsEnabled) { "Green" } else { "Gray" }
+        
+        Write-ColorOutput "  $status`: $($operation.LogKey) - Size: $($operation.SizeMB)MB" $color
+        
+        $configurationResults += [PSCustomObject]@{
+            LogName = $operation.LogKey
+            Status = "Success"
+            SizeMB = $operation.SizeMB
+            Enabled = $operation.IsEnabled
+        }
+        
+    } catch {
+        $failureCount++
+        Write-ColorOutput "  Failed to configure: $($operation.LogKey) - $_" "Red"
+        
+        $configurationResults += [PSCustomObject]@{
+            LogName = $operation.LogKey
+            Status = "Failed"
+            Error = $_.Exception.Message
+        }
+    }
+}
+
+# Display summary statistics
+Write-ColorOutput "`nConfiguration Summary:" "Cyan"
+Write-ColorOutput "  Successfully configured: $successCount logs" "Green"
+if ($failureCount -gt 0) {
+    Write-ColorOutput "  Failed to configure: $failureCount logs" "Red"
+}
+Write-ColorOutput "  Total logs processed: $($logSizes.Count)" "White"
+
+# GPO linking will be performed manually after script execution
+
+# Enhanced final reporting with performance metrics
+Write-ColorOutput "`n" + "="*60 "Cyan"
+Write-ColorOutput "DEPLOYMENT SUMMARY" "Cyan"
+Write-ColorOutput "="*60 "Cyan"
+
+Write-ColorOutput "`nGPO Information:" "White"
+Write-ColorOutput "  Name: $($gpo.DisplayName)" "Gray"
+Write-ColorOutput "  ID: $($gpo.Id)" "Gray"
+Write-ColorOutput "  Status: $($gpo.GpoStatus)" "Gray"
+Write-ColorOutput "  Created: $($gpo.CreationTime)" "Gray"
+Write-ColorOutput "  Modified: $($gpo.ModificationTime)" "Gray"
+
+Write-ColorOutput "`nConfiguration Results:" "White"
+$successfulLogs = $configurationResults | Where-Object { $_.Status -eq "Success" }
+$failedLogs = $configurationResults | Where-Object { $_.Status -eq "Failed" }
+$enabledLogs = $successfulLogs | Where-Object { $_.Enabled -eq $true }
+
+Write-ColorOutput "  Total logs configured: $($successfulLogs.Count)" "Green"
+Write-ColorOutput "  Logs enabled: $($enabledLogs.Count)" "Green"
+Write-ColorOutput "  Configuration failures: $($failedLogs.Count)" $(if ($failedLogs.Count -eq 0) { "Green" } else { "Red" })
+
+# Calculate total storage allocation
+$totalStorageMB = ($successfulLogs | Measure-Object -Property SizeMB -Sum).Sum
+Write-ColorOutput "  Total log storage allocated: $totalStorageMB MB ($([math]::Round($totalStorageMB/1024, 2)) GB)" "Cyan"
+
+if ($failedLogs.Count -gt 0) {
+    Write-ColorOutput "`nFailed Configurations:" "Red"
+    foreach ($failed in $failedLogs) {
+        Write-ColorOutput "  - $($failed.LogName): $($failed.Error)" "Red"
+    }
+}
+
+Write-ColorOutput "`nNext Steps:" "Yellow"
+Write-ColorOutput "  1. Manually link GPO '$GPOName' to desired organizational units" "Cyan"
+Write-ColorOutput "  2. Allow time for GPO replication across domain controllers" "Gray"
+Write-ColorOutput "  3. Run 'gpupdate /force' on target computers or wait for next refresh cycle" "Gray"
+Write-ColorOutput "  4. Verify settings using 'wevtutil gl <LogName>' on target systems" "Gray"
+Write-ColorOutput "  5. Monitor event log performance and adjust sizes if needed" "Gray"
+
+Write-ColorOutput "`nLog size configuration completed successfully!" "Green"
+Write-ColorOutput "GPO '$GPOName' is ready for manual linking and deployment." "Green"
